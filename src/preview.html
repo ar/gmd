@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>{{TITLE}} — GMail Draft</title>
+<style>
+body { margin: 0; background: #f3f5f8; color: #202124; font: 15px/1.5 system-ui,sans-serif; }
+main { max-width: 820px; margin: 36px auto; padding: 0 24px; }
+header { margin-bottom: 24px; } h1 { font-size: 24px; }
+button, .action { display: inline-block; padding: 10px 16px; margin-right: 8px; border: 1px solid #2459a6; border-radius: 6px; background: #2459a6; color: white; font: inherit; text-decoration: none; cursor: pointer; }
+.action { background: white; color: #2459a6; }
+#email { background: white; border: 1px solid #dfe3e8; border-radius: 8px; padding: 28px; }
+#status { min-height: 24px; color: #45546a; }
+</style>
+</head>
+<body><main>
+<header><h1>{{TITLE}}</h1>
+<p>Gmail opens with a plain-text version of your message. To use the formatting shown below:</p>
+<ol>
+<li>Copy the formatted email.</li>
+<li>Open Gmail, click inside the message body, and select the body text.</li>
+<li>Paste with Ctrl+V or ⌘V to replace it with the formatted message. Add attachments and review.</li>
+</ol>
+<button id="copy" type="button">1. Copy formatted email</button>
+<a id="gmail" class="action" href="{{URL}}" target="_blank" rel="noopener noreferrer">2. Open Gmail</a>
+<p id="status" role="status" aria-live="polite">Copying does not fill Gmail automatically. Keep Gmail’s “Plain text mode” off and use normal paste.</p>
+<p id="highlight-status" hidden></p>
+</header>
+<article id="email">{{BODY}}</article>
+</main>
+<script>
+const email = document.getElementById('email');
+const status = document.getElementById('status');
+const codeBlocks = [...email.querySelectorAll('pre')];
+const plainBlocks = codeBlocks.filter(block => !block.querySelector('span[style*="color:"]'));
+if (plainBlocks.length) {
+  const note = document.getElementById('highlight-status');
+  note.hidden = false;
+  note.textContent = `${plainBlocks.length} code block(s) have no colored tokens. For highlighting, label the opening fence with a supported language, such as python, javascript, bash, or rust. Plain output is also normal for code with no highlightable tokens.`;
+}
+document.getElementById('gmail').addEventListener('click', () => {
+  status.textContent = 'In Gmail: click inside the message body, select its text, then paste to replace it with the formatted email.';
+});
+document.getElementById('copy').addEventListener('click', async () => {
+  const html = email.innerHTML;
+  const text = email.innerText;
+  try {
+    await navigator.clipboard.write([new ClipboardItem({
+      'text/html': new Blob([html], {type: 'text/html'}),
+      'text/plain': new Blob([text], {type: 'text/plain'})
+    })]);
+    status.textContent = 'Formatted email copied. Open Gmail, select the existing message body, and paste to replace it.';
+  } catch (_) {
+    // File URLs and some browsers do not support the asynchronous clipboard API.
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(email);
+    selection.removeAllRanges(); selection.addRange(range);
+    const onCopy = event => {
+      if (!event.clipboardData) return;
+      event.clipboardData.setData('text/html', html);
+      event.clipboardData.setData('text/plain', text);
+      event.preventDefault();
+    };
+    document.addEventListener('copy', onCopy);
+    let copied = false;
+    try { copied = document.execCommand('copy'); } catch (_) {}
+    document.removeEventListener('copy', onCopy);
+    if (copied) selection.removeAllRanges();
+    status.textContent = copied
+      ? 'Formatted email copied. Open Gmail, select the existing message body, and paste to replace it.'
+      : 'Message selected. Press Ctrl+C or ⌘C, then open Gmail and replace the existing body by pasting.';
+  }
+});
+</script></body></html>
